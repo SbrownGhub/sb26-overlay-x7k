@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed Build — Control v2</title>
+<style>
+  body { background:#111; color:#fff; font-family:Arial,sans-serif; padding:24px 16px; max-width:520px; margin:0 auto; }
+  h1 { font-size:18px; margin:0 0 2px; }
+  #status { color:#888; font-size:12px; margin-bottom:20px; }
+  .section { background:#1b1b1b; border-radius:10px; padding:14px; margin-bottom:14px; }
+  .section h2 { font-size:13px; letter-spacing:2px; color:#999; margin:0 0 10px; text-transform:uppercase; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  button { padding:14px 16px; font-size:15px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; flex:1; min-width:100px; }
+  input { padding:12px; font-size:15px; border-radius:8px; border:1px solid #444; background:#222; color:#fff; flex:1; min-width:80px; }
+  .green{background:#00d97e;color:#000;} .red{background:#ff4444;color:#000;}
+  .neutral{background:#333;color:#fff;} .primary{background:#4c8cff;color:#000;}
+  .amber{background:#ffb84c;color:#000;}
+  #pot-readout { font-size:34px; font-weight:900; text-align:center; margin:6px 0 12px; font-variant-numeric:tabular-nums; }
+  .small { font-size:12px; color:#777; margin-top:6px; }
+</style>
+</head>
+<body>
+  <h1>Speed Build Control v2</h1>
+  <div id="status">connecting...</div>
+
+  <div class="section">
+    <h2>Prize Pot</h2>
+    <div id="pot-readout">$--,---</div>
+    <div class="row">
+      <input type="number" id="pot-set" placeholder="Set pot $" value="20000">
+      <button class="neutral" onclick="setPot()">Set</button>
+    </div>
+    <div class="row">
+      <input type="number" id="pot-rate" placeholder="Drain $/min" value="35">
+      <button class="primary" onclick="startPot()">▶ Start Drain</button>
+      <button class="amber" onclick="pausePot()">⏸ Pause</button>
+    </div>
+    <div class="row">
+      <button class="red" onclick="penalty(50)">-$50 Penalty</button>
+      <button class="red" onclick="penaltyCustom()">-Custom</button>
+      <input type="number" id="pot-penalty" placeholder="$" value="100">
+    </div>
+    <div class="small">Drain at $35/min ≈ $18.9k over 9hrs — tune the rate so the pot lands where the finale needs it.</div>
+  </div>
+
+  <div class="section">
+    <h2>Round Timer</h2>
+    <div class="row">
+      <input type="text" id="round-name" placeholder="Round label" value="ROOM 1 — OPERATIONS">
+      <input type="number" id="round-mins" placeholder="Mins" value="40">
+    </div>
+    <div class="row">
+      <button class="primary" onclick="startRound()">▶ Start Round</button>
+      <button class="neutral" onclick="clearRound()">Hide Timer</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Effects</h2>
+    <div class="row">
+      <button class="green" onclick="fx('fx:win')">🟢 WIN</button>
+      <button class="red" onclick="fx('fx:lose')">🔴 LOSE</button>
+      <button class="primary" onclick="fx('fx:cash')">💰 CASH</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.ably.io/lib/ably.min.js"></script>
+  <script>
+    // ====== CONFIG — must match overlay.html ======
+    const ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
+    const CHANNEL_NAME = 'speedbuild-overlay-v2';
+    // ================================================
+
+    const ably = new Ably.Realtime(ABLY_API_KEY);
+    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '1' } });
+    const statusEl = document.getElementById('status');
+    const readout = document.getElementById('pot-readout');
+
+    ably.connection.on('connected', () => statusEl.textContent = 'connected · ' + CHANNEL_NAME);
+
+    // ---------- STATE (control panel is the source of truth) ----------
+    let S = {
+      potBase: 20000,        // pot value at potBaseTime
+      potBaseTime: Date.now(),
+      potRatePerMin: 35,
+      potRunning: false,
+      roundEndTime: null,
+      roundName: null
+    };
+
+    // On load, pick up existing state (e.g. control panel reopened mid-show)
+    channel.subscribe('state', (msg) => { S = msg.data; });
+
+    function currentPot() {
+      if (!S.potRunning) return S.potBase;
+      return S.potBase - ((Date.now() - S.potBaseTime) / 60000) * S.potRatePerMin;
+    }
+
+    // Freeze the current computed value into base before any change,
+    // so pausing/re-rating never jumps the number.
+    function snapshot() {
+      S.potBase = currentPot();
+      S.potBaseTime = Date.now();
+    }
+
+    function publish() {
+      channel.publish('state', S);
+    }
+
+    // ---------- POT ----------
+    function setPot() {
+      snapshot();
+      S.potBase = parseFloat(document.getElementById('pot-set').value) || 0;
+      S.potBaseTime = Date.now();
+      publish();
+    }
+    function startPot() {
+      snapshot();
+      S.potRatePerMin = parseFloat(document.getElementById('pot-rate').value) || 0;
+      S.potRunning = true;
+      publish();
+    }
+    function pausePot() {
+      snapshot();
+      S.potRunning = false;
+      publish();
+    }
+    function penalty(amount) {
+      snapshot();
+      S.potBase = Math.max(0, S.potBase - amount);
+      publish();
+      channel.publish('fx:penalty', { amount });
+    }
+    function penaltyCustom() {
+      const amt = parseFloat(document.getElementById('pot-penalty').value) || 0;
+      if (amt > 0) penalty(amt);
+    }
+
+    // ---------- ROUND ----------
+    function startRound() {
+      const mins = parseFloat(document.getElementById('round-mins').value) || 0;
+      S.roundName = document.getElementById('round-name').value || 'ROUND';
+      S.roundEndTime = Date.now() + mins * 60000;
+      publish();
+    }
+    function clearRound() {
+      S.roundEndTime = null;
+      publish();
+    }
+
+    // ---------- FX ----------
+    function fx(name) { channel.publish(name, {}); }
+
+    // Local readout so the operator sees the pot without looking at the stream
+    setInterval(() => {
+      readout.textContent = '$' + Math.max(0, Math.floor(currentPot())).toLocaleString('en-US');
+    }, 250);
+  </script>
+</body>
+</html>

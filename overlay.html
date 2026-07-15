@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Speed Build Overlay v2</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    font-family: 'Arial Black', Arial, sans-serif;
+  }
+
+  /* THE POT — always visible, top right */
+  #pot {
+    position: absolute;
+    top: 30px; right: 40px;
+    text-align: right;
+  }
+  #pot-label {
+    font-size: 18px;
+    letter-spacing: 6px;
+    color: #ff3b3b;
+    margin-bottom: 4px;
+  }
+  #pot-value {
+    font-size: 84px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 0 20px rgba(0,0,0,0.85), 0 0 4px #000;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  #pot-value.hit {
+    animation: potHit 0.7s ease-out;
+  }
+  @keyframes potHit {
+    0% { color: #ff3b3b; transform: scale(1.06); }
+    100% { color: #ffffff; transform: scale(1); }
+  }
+
+  /* Penalty popup next to pot */
+  #penalty-pop {
+    position: absolute;
+    top: 140px; right: 40px;
+    font-size: 40px;
+    font-weight: 900;
+    color: #ff3b3b;
+    text-shadow: 0 0 12px rgba(0,0,0,0.8);
+    opacity: 0;
+  }
+  #penalty-pop.show { animation: penaltyFloat 1.6s ease-out forwards; }
+  @keyframes penaltyFloat {
+    0% { opacity: 0; transform: translateY(0); }
+    15% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-40px); }
+  }
+
+  /* ROUND TIMER — top left */
+  #round {
+    position: absolute;
+    top: 30px; left: 40px;
+  }
+  #round-label {
+    font-size: 16px;
+    letter-spacing: 5px;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 4px;
+  }
+  #round-timer {
+    font-size: 60px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 0 16px rgba(0,0,0,0.85);
+    font-variant-numeric: tabular-nums;
+  }
+  #round-timer.warning { color: #ff3b3b; }
+  #round.hidden { display: none; }
+
+  /* Full screen flashes */
+  #flash {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    opacity: 0; pointer-events: none;
+  }
+  #flash.green { background: radial-gradient(circle, rgba(0,255,120,0.55), rgba(0,255,120,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
+  #flash.red   { background: radial-gradient(circle, rgba(255,30,30,0.55), rgba(255,30,30,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
+  @keyframes flashPulse { 0% {opacity:0;} 15% {opacity:1;} 100% {opacity:0;} }
+
+  /* Cash burst */
+  #cash-layer { position: fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; overflow:hidden; }
+  .cash-bill {
+    position: absolute; top: -60px;
+    color: #00d97e;
+    text-shadow: 0 0 10px rgba(0,0,0,0.6);
+    animation: fall 2.6s ease-in forwards;
+  }
+  @keyframes fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+  }
+
+  #status {
+    position: absolute; bottom: 16px; left: 16px;
+    font-size: 11px; color: rgba(255,255,255,0.35);
+    font-family: monospace;
+  }
+</style>
+</head>
+<body>
+
+  <div id="pot">
+    <div id="pot-label">PRIZE POT</div>
+    <div id="pot-value">$--,---</div>
+  </div>
+  <div id="penalty-pop"></div>
+
+  <div id="round" class="hidden">
+    <div id="round-label">ROUND</div>
+    <div id="round-timer">--:--</div>
+  </div>
+
+  <div id="flash"></div>
+  <div id="cash-layer"></div>
+  <div id="status">connecting...</div>
+
+  <audio id="sound-win" src="sounds/win.mp3" preload="auto"></audio>
+  <audio id="sound-lose" src="sounds/lose.mp3" preload="auto"></audio>
+  <audio id="sound-cash" src="sounds/cash.mp3" preload="auto"></audio>
+  <audio id="sound-penalty" src="sounds/penalty.mp3" preload="auto"></audio>
+
+  <script src="https://cdn.ably.io/lib/ably.min.js"></script>
+  <script>
+    // ====== CONFIG ======
+    const ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
+    const CHANNEL_NAME = 'speedbuild-overlay-v2';
+    // ====================
+
+    // rewind=1 -> on (re)connect, replay the last published state message.
+    // This is what makes the overlay survive refreshes and StreamLabs restarts.
+    const ably = new Ably.Realtime(ABLY_API_KEY);
+    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '1' } });
+
+    const potEl = document.getElementById('pot-value');
+    const penaltyEl = document.getElementById('penalty-pop');
+    const roundWrap = document.getElementById('round');
+    const roundEl = document.getElementById('round-timer');
+    const roundLabel = document.getElementById('round-label');
+    const flashEl = document.getElementById('flash');
+    const statusEl = document.getElementById('status');
+
+    ably.connection.on('connected', () => statusEl.textContent = 'live · ' + CHANNEL_NAME);
+    ably.connection.on('disconnected', () => statusEl.textContent = 'reconnecting...');
+
+    // ---------- STATE ----------
+    // The control panel is the single source of truth. Every change publishes
+    // a full 'state' message. The overlay just renders whatever state says.
+    let S = null;          // last received state
+    let renderTick = null;
+
+    function fmtMoney(v) {
+      v = Math.max(0, v);
+      return '$' + Math.floor(v).toLocaleString('en-US');
+    }
+    function fmtTime(ms) {
+      ms = Math.max(0, ms);
+      const t = Math.floor(ms / 1000);
+      const m = String(Math.floor(t / 60)).padStart(2, '0');
+      const s = String(t % 60).padStart(2, '0');
+      return m + ':' + s;
+    }
+
+    // Compute the live pot value from state:
+    // baseValue was correct at baseTime; drain happens only while running.
+    function currentPot() {
+      if (!S) return null;
+      if (!S.potRunning) return S.potBase;
+      const elapsedMin = (Date.now() - S.potBaseTime) / 60000;
+      return S.potBase - elapsedMin * S.potRatePerMin;
+    }
+
+    function currentRoundRemaining() {
+      if (!S || !S.roundEndTime) return null;
+      return S.roundEndTime - Date.now();
+    }
+
+    function render() {
+      const pot = currentPot();
+      if (pot !== null) potEl.textContent = fmtMoney(pot);
+
+      const rem = currentRoundRemaining();
+      if (rem === null) {
+        roundWrap.classList.add('hidden');
+      } else {
+        roundWrap.classList.remove('hidden');
+        roundLabel.textContent = S.roundName || 'ROUND';
+        roundEl.textContent = fmtTime(rem);
+        roundEl.classList.toggle('warning', rem < 5 * 60 * 1000);
+      }
+    }
+
+    function startRenderLoop() {
+      if (renderTick) clearInterval(renderTick);
+      renderTick = setInterval(render, 250);
+    }
+
+    // ---------- EFFECTS ----------
+    function playSound(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.currentTime = 0;
+      el.play().catch(() => {});
+    }
+    function triggerFlash(cls) {
+      flashEl.classList.remove('green', 'red');
+      void flashEl.offsetWidth;
+      flashEl.classList.add(cls);
+      setTimeout(() => flashEl.classList.remove(cls), 1900);
+    }
+    function potHitAnim(amount) {
+      potEl.classList.remove('hit');
+      void potEl.offsetWidth;
+      potEl.classList.add('hit');
+      penaltyEl.textContent = '-$' + amount.toLocaleString('en-US');
+      penaltyEl.classList.remove('show');
+      void penaltyEl.offsetWidth;
+      penaltyEl.classList.add('show');
+    }
+    function cashBurst(count = 24) {
+      const layer = document.getElementById('cash-layer');
+      const symbols = ['$', '£', '€'];
+      for (let i = 0; i < count; i++) {
+        const b = document.createElement('div');
+        b.className = 'cash-bill';
+        b.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        b.style.left = Math.random() * 100 + 'vw';
+        b.style.animationDelay = (Math.random() * 0.6) + 's';
+        b.style.fontSize = (32 + Math.random() * 32) + 'px';
+        layer.appendChild(b);
+        setTimeout(() => b.remove(), 3400);
+      }
+    }
+
+    // ---------- SUBSCRIPTIONS ----------
+    channel.subscribe('state', (msg) => {
+      S = msg.data;
+      render();
+      startRenderLoop();
+    });
+
+    channel.subscribe('fx:penalty', (msg) => {
+      potHitAnim(msg.data.amount);
+      playSound('sound-penalty');
+    });
+    channel.subscribe('fx:win',  () => { triggerFlash('green'); playSound('sound-win'); });
+    channel.subscribe('fx:lose', () => { triggerFlash('red');  playSound('sound-lose'); });
+    channel.subscribe('fx:cash', () => { cashBurst(); playSound('sound-cash'); });
+  </script>
+</body>
+</html>
