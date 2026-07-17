@@ -129,8 +129,11 @@
     function penalty(amount) {
       snapshot();
       S.potBase = Math.max(0, S.potBase - amount);
-      publish();
+      // fx first, state LAST — rewind=1 replays only the most recent message,
+      // so state must always be the newest thing on the channel for a
+      // reconnecting overlay to recover correctly.
       channel.publish('fx:penalty', { amount });
+      publish();
     }
     function penaltyCustom() {
       const amt = parseFloat(document.getElementById('pot-penalty').value) || 0;
@@ -150,12 +153,23 @@
     }
 
     // ---------- FX ----------
-    function fx(name) { channel.publish(name, {}); }
+    // Effects also republish state afterwards, so the newest channel message
+    // is always 'state' — a reconnecting overlay's rewind=1 then always
+    // recovers the pot/timer, never just a sound cue.
+    function fx(name) {
+      channel.publish(name, {});
+      publish();
+    }
 
     // Local readout so the operator sees the pot without looking at the stream
     setInterval(() => {
       readout.textContent = '$' + Math.max(0, Math.floor(currentPot())).toLocaleString('en-US');
     }, 250);
+
+    // Heartbeat: republish state every ~30s (with jitter so multiple open
+    // panels don't all fire at once). Self-heals any message-ordering edge
+    // case within half a minute, and keeps rewind recovery always-fresh.
+    setInterval(() => { publish(); }, 30000 + Math.floor(Math.random() * 5000));
   </script>
 </body>
 </html>

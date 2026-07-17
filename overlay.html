@@ -138,10 +138,14 @@
     const CHANNEL_NAME = 'speedbuild-overlay-v2';
     // ====================
 
-    // rewind=1 -> on (re)connect, replay the last published state message.
-    // This is what makes the overlay survive refreshes and StreamLabs restarts.
+    // rewind=10 -> on (re)connect, replay the last 10 messages. The control
+    // panel always publishes 'state' last (and heartbeats it every ~30s), so
+    // at least one state message is guaranteed inside the rewind window —
+    // the overlay recovers pot + timer even if effects fired just before a
+    // refresh. Replayed fx messages may re-fire a flash/sound once on
+    // reconnect; harmless, and correct state always lands last.
     const ably = new Ably.Realtime(ABLY_API_KEY);
-    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '1' } });
+    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '10' } });
 
     const potEl = document.getElementById('pot-value');
     const penaltyEl = document.getElementById('penalty-pop');
@@ -250,13 +254,22 @@
       startRenderLoop();
     });
 
+    // Staleness guard: rewind replays recent messages on reconnect. State is
+    // safe to replay (it's absolute), but effects are moments — a replayed
+    // LOSE flash firing mid-broadcast after a reconnect would be visible and
+    // wrong. Only fire fx received within 3 seconds of being published.
+    function isLive(msg) {
+      return (Date.now() - msg.timestamp) < 3000;
+    }
+
     channel.subscribe('fx:penalty', (msg) => {
+      if (!isLive(msg)) return;
       potHitAnim(msg.data.amount);
       playSound('sound-penalty');
     });
-    channel.subscribe('fx:win',  () => { triggerFlash('green'); playSound('sound-win'); });
-    channel.subscribe('fx:lose', () => { triggerFlash('red');  playSound('sound-lose'); });
-    channel.subscribe('fx:cash', () => { cashBurst(); playSound('sound-cash'); });
+    channel.subscribe('fx:win',  (msg) => { if (!isLive(msg)) return; triggerFlash('green'); playSound('sound-win'); });
+    channel.subscribe('fx:lose', (msg) => { if (!isLive(msg)) return; triggerFlash('red');  playSound('sound-lose'); });
+    channel.subscribe('fx:cash', (msg) => { if (!isLive(msg)) return; cashBurst(); playSound('sound-cash'); });
   </script>
 </body>
 </html>
