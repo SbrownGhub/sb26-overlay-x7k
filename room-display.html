@@ -3,10 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <title>Speed Build — Room Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   html, body {
     margin: 0; padding: 0;
-    background: #000000;            /* solid black — this is a physical screen, not a stream layer */
+    background: #000000;
     overflow: hidden;
     width: 100vw; height: 100vh;
     font-family: 'Arial Black', Arial, sans-serif;
@@ -15,9 +17,43 @@
     justify-content: center;
   }
 
+  /* ---- Lost-signal test card background ---- */
+  #bars {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 78vh;
+    display: flex;
+    z-index: 0;
+  }
+  #bars div { flex: 1; }
+  #bars-bottom {
+    position: fixed; bottom: 0; left: 0;
+    width: 100vw; height: 22vh;
+    display: flex;
+    z-index: 0;
+  }
+  #bars-bottom div { flex: 1; }
+  /* faint vertical scan texture + slow flicker over the bars */
+  #scanlines {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 1;
+    pointer-events: none;
+    background: repeating-linear-gradient(90deg, rgba(0,0,0,0.14) 0 2px, rgba(255,255,255,0.03) 2px 4px);
+    animation: signalFlicker 4s steps(2) infinite;
+  }
+  @keyframes signalFlicker {
+    0%, 92% { opacity: 1; }
+    93%, 95% { opacity: 0.82; }
+    96%, 100% { opacity: 1; }
+  }
+
+  /* central black panel — the classic blacked-out band over the bars */
   #stack {
     text-align: center;
     z-index: 2;
+    background: #000;
+    padding: 5vh 6vw;
+    min-width: 62vw;
   }
 
   /* ROOM NAME — top of the stack */
@@ -30,9 +66,9 @@
 
   /* ROUND TIMER — the centrepiece */
   #round-timer {
-    font-size: 22vw;
-    font-weight: 900;
-    line-height: 1;
+    font-family: 'Press Start 2P', 'Arial Black', monospace;
+    font-size: 12.5vw;
+    line-height: 1.1;
     color: #ffffff;
     font-variant-numeric: tabular-nums;
     text-shadow: 0 0 40px rgba(255, 59, 59, 0.25);
@@ -55,8 +91,8 @@
     margin-bottom: 0.5vh;
   }
   #pot-value {
-    font-size: 8vw;
-    font-weight: 900;
+    font-family: 'Press Start 2P', 'Arial Black', monospace;
+    font-size: 5.5vw;
     color: #00d97e;
     font-variant-numeric: tabular-nums;
   }
@@ -72,8 +108,8 @@
     bottom: 18vh;
     width: 100vw;
     text-align: center;
-    font-size: 7vw;
-    font-weight: 900;
+    font-family: 'Press Start 2P', 'Arial Black', monospace;
+    font-size: 4.5vw;
     color: #ff3b3b;
     opacity: 0;
     pointer-events: none;
@@ -92,8 +128,9 @@
     opacity: 0; pointer-events: none;
     z-index: 3;
   }
-  #flash.green { background: radial-gradient(circle, rgba(0,255,120,0.55), rgba(0,255,120,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
-  #flash.red   { background: radial-gradient(circle, rgba(255,30,30,0.55), rgba(255,30,30,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
+  /* Inverted: glow floods in from the screen edges, centre stays clear */
+  #flash.green { background: radial-gradient(ellipse at center, rgba(0,255,120,0) 35%, rgba(0,255,120,0.45) 70%, rgba(0,255,120,0.9) 100%); animation: flashPulse 1.8s ease-out forwards; }
+  #flash.red   { background: radial-gradient(ellipse at center, rgba(255,30,30,0) 35%, rgba(255,30,30,0.45) 70%, rgba(255,30,30,0.9) 100%); animation: flashPulse 1.8s ease-out forwards; }
   @keyframes flashPulse { 0% {opacity:0;} 15% {opacity:1;} 100% {opacity:0;} }
 
   /* Cash burst */
@@ -114,7 +151,7 @@
   body.no-round #round-label, body.no-round #round-timer { display: none; }
   body.no-round #pot-block { margin-top: 0; }
   body.no-round #pot-label { font-size: 4vw; }
-  body.no-round #pot-value { font-size: 20vw; }
+  body.no-round #pot-value { font-size: 11vw; }
 
   #status {
     position: fixed; bottom: 12px; left: 14px;
@@ -124,6 +161,26 @@
 </style>
 </head>
 <body class="no-round">
+
+  <div id="bars">
+    <div style="background:#c8c8c8"></div>
+    <div style="background:#e6e600"></div>
+    <div style="background:#00e6e6"></div>
+    <div style="background:#00d100"></div>
+    <div style="background:#e600e6"></div>
+    <div style="background:#e60000"></div>
+    <div style="background:#0000e6"></div>
+  </div>
+  <div id="bars-bottom">
+    <div style="background:#0000e6"></div>
+    <div style="background:#131313"></div>
+    <div style="background:#e600e6"></div>
+    <div style="background:#131313"></div>
+    <div style="background:#00e6e6"></div>
+    <div style="background:#131313"></div>
+    <div style="background:#c8c8c8"></div>
+  </div>
+  <div id="scanlines"></div>
 
   <div id="stack">
     <div id="round-label">ROUND</div>

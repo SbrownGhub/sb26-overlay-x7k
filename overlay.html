@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Speed Build Overlay v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   html, body {
     margin: 0; padding: 0;
@@ -25,8 +27,8 @@
     margin-bottom: 4px;
   }
   #pot-value {
-    font-size: 84px;
-    font-weight: 900;
+    font-family: 'Press Start 2P', 'Arial Black', monospace;
+    font-size: 58px;
     color: #ffffff;
     text-shadow: 0 0 20px rgba(0,0,0,0.85), 0 0 4px #000;
     letter-spacing: 2px;
@@ -42,10 +44,10 @@
 
   /* Penalty popup next to pot */
   #penalty-pop {
+    font-family: 'Press Start 2P', 'Arial Black', monospace;
     position: absolute;
     top: 140px; right: 40px;
-    font-size: 40px;
-    font-weight: 900;
+    font-size: 30px;
     color: #ff3b3b;
     text-shadow: 0 0 12px rgba(0,0,0,0.8);
     opacity: 0;
@@ -69,8 +71,8 @@
     margin-bottom: 4px;
   }
   #round-timer {
-    font-size: 60px;
-    font-weight: 900;
+    font-family: 'Press Start 2P', 'Arial Black', monospace;
+    font-size: 42px;
     color: #ffffff;
     text-shadow: 0 0 16px rgba(0,0,0,0.85);
     font-variant-numeric: tabular-nums;
@@ -84,8 +86,9 @@
     width: 100vw; height: 100vh;
     opacity: 0; pointer-events: none;
   }
-  #flash.green { background: radial-gradient(circle, rgba(0,255,120,0.55), rgba(0,255,120,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
-  #flash.red   { background: radial-gradient(circle, rgba(255,30,30,0.55), rgba(255,30,30,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
+  /* Inverted: glow floods in from the screen edges, centre stays clear */
+  #flash.green { background: radial-gradient(ellipse at center, rgba(0,255,120,0) 35%, rgba(0,255,120,0.45) 70%, rgba(0,255,120,0.85) 100%); animation: flashPulse 1.8s ease-out forwards; }
+  #flash.red   { background: radial-gradient(ellipse at center, rgba(255,30,30,0) 35%, rgba(255,30,30,0.45) 70%, rgba(255,30,30,0.85) 100%); animation: flashPulse 1.8s ease-out forwards; }
   @keyframes flashPulse { 0% {opacity:0;} 15% {opacity:1;} 100% {opacity:0;} }
 
   /* Cash burst */
