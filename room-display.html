@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Speed Build — Room Display</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #000000;            /* solid black — this is a physical screen, not a stream layer */
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    font-family: 'Arial Black', Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #stack {
+    text-align: center;
+    z-index: 2;
+  }
+
+  /* ROOM NAME — top of the stack */
+  #round-label {
+    font-size: 4.5vw;
+    letter-spacing: 1.2vw;
+    color: #ff3b3b;
+    margin-bottom: 1vh;
+  }
+
+  /* ROUND TIMER — the centrepiece */
+  #round-timer {
+    font-size: 22vw;
+    font-weight: 900;
+    line-height: 1;
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 40px rgba(255, 59, 59, 0.25);
+  }
+  #round-timer.warning {
+    color: #ff3b3b;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  /* PRIZE POT — beneath the timer */
+  #pot-block { margin-top: 4vh; }
+  #pot-label {
+    font-size: 2.2vw;
+    letter-spacing: 1vw;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 0.5vh;
+  }
+  #pot-value {
+    font-size: 8vw;
+    font-weight: 900;
+    color: #00d97e;
+    font-variant-numeric: tabular-nums;
+  }
+  #pot-value.hit { animation: potHit 0.7s ease-out; }
+  @keyframes potHit {
+    0% { color: #ff3b3b; transform: scale(1.08); }
+    100% { color: #00d97e; transform: scale(1); }
+  }
+
+  /* Penalty popup — floats over the pot */
+  #penalty-pop {
+    position: fixed;
+    bottom: 18vh;
+    width: 100vw;
+    text-align: center;
+    font-size: 7vw;
+    font-weight: 900;
+    color: #ff3b3b;
+    opacity: 0;
+    pointer-events: none;
+  }
+  #penalty-pop.show { animation: penaltyFloat 1.6s ease-out forwards; }
+  @keyframes penaltyFloat {
+    0% { opacity: 0; transform: translateY(0); }
+    15% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-8vh); }
+  }
+
+  /* Full screen flashes */
+  #flash {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    opacity: 0; pointer-events: none;
+    z-index: 3;
+  }
+  #flash.green { background: radial-gradient(circle, rgba(0,255,120,0.55), rgba(0,255,120,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
+  #flash.red   { background: radial-gradient(circle, rgba(255,30,30,0.55), rgba(255,30,30,0) 70%); animation: flashPulse 1.8s ease-out forwards; }
+  @keyframes flashPulse { 0% {opacity:0;} 15% {opacity:1;} 100% {opacity:0;} }
+
+  /* Cash burst */
+  #cash-layer { position: fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; overflow:hidden; z-index: 3; }
+  .cash-bill {
+    position: absolute; top: -60px;
+    color: #00d97e;
+    text-shadow: 0 0 10px rgba(0,0,0,0.6);
+    animation: fall 2.6s ease-in forwards;
+  }
+  @keyframes fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+  }
+
+  /* No-round idle state: pot takes centre stage instead */
+  body.no-round #round-label, body.no-round #round-timer { display: none; }
+  body.no-round #pot-block { margin-top: 0; }
+  body.no-round #pot-label { font-size: 4vw; }
+  body.no-round #pot-value { font-size: 20vw; }
+
+  #status {
+    position: fixed; bottom: 12px; left: 14px;
+    font-size: 11px; color: rgba(255,255,255,0.25);
+    font-family: monospace;
+  }
+</style>
+</head>
+<body class="no-round">
+
+  <div id="stack">
+    <div id="round-label">ROUND</div>
+    <div id="round-timer">--:--</div>
+    <div id="pot-block">
+      <div id="pot-label">PRIZE POT</div>
+      <div id="pot-value">$--,---</div>
+    </div>
+  </div>
+
+  <div id="penalty-pop"></div>
+  <div id="flash"></div>
+  <div id="cash-layer"></div>
+  <div id="status">connecting...</div>
+
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+  <script>
+    // ====== CONFIG — same key + channel as overlay.html / control.html ======
+    const ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
+    const CHANNEL_NAME = 'speedbuild-overlay-v2';
+    // =========================================================================
+
+    const ably = new Ably.Realtime(ABLY_API_KEY);
+    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '10' } });
+
+    const potEl = document.getElementById('pot-value');
+    const penaltyEl = document.getElementById('penalty-pop');
+    const roundEl = document.getElementById('round-timer');
+    const roundLabel = document.getElementById('round-label');
+    const flashEl = document.getElementById('flash');
+    const statusEl = document.getElementById('status');
+
+    ably.connection.on('connected', () => statusEl.textContent = 'live · room display');
+    ably.connection.on('disconnected', () => statusEl.textContent = 'reconnecting...');
+
+    let S = null;
+    let renderTick = null;
+
+    function fmtMoney(v) {
+      v = Math.max(0, v);
+      return '$' + Math.floor(v).toLocaleString('en-US');
+    }
+    function fmtTime(ms) {
+      ms = Math.max(0, ms);
+      const t = Math.floor(ms / 1000);
+      const m = String(Math.floor(t / 60)).padStart(2, '0');
+      const s = String(t % 60).padStart(2, '0');
+      return m + ':' + s;
+    }
+    function currentPot() {
+      if (!S) return null;
+      if (!S.potRunning) return S.potBase;
+      return S.potBase - ((Date.now() - S.potBaseTime) / 60000) * S.potRatePerMin;
+    }
+    function currentRoundRemaining() {
+      if (!S || !S.roundEndTime) return null;
+      return S.roundEndTime - Date.now();
+    }
+
+    function render() {
+      const pot = currentPot();
+      if (pot !== null) potEl.textContent = fmtMoney(pot);
+
+      const rem = currentRoundRemaining();
+      if (rem === null) {
+        document.body.classList.add('no-round');   // idle: pot goes huge and central
+      } else {
+        document.body.classList.remove('no-round');
+        roundLabel.textContent = S.roundName || 'ROUND';
+        roundEl.textContent = fmtTime(rem);
+        roundEl.classList.toggle('warning', rem < 5 * 60 * 1000);
+      }
+    }
+
+    function startRenderLoop() {
+      if (renderTick) clearInterval(renderTick);
+      renderTick = setInterval(render, 250);
+    }
+
+    function triggerFlash(cls) {
+      flashEl.classList.remove('green', 'red');
+      void flashEl.offsetWidth;
+      flashEl.classList.add(cls);
+      setTimeout(() => flashEl.classList.remove(cls), 1900);
+    }
+    function potHitAnim(amount) {
+      potEl.classList.remove('hit');
+      void potEl.offsetWidth;
+      potEl.classList.add('hit');
+      penaltyEl.textContent = '-$' + amount.toLocaleString('en-US');
+      penaltyEl.classList.remove('show');
+      void penaltyEl.offsetWidth;
+      penaltyEl.classList.add('show');
+    }
+    function cashBurst(count = 24) {
+      const layer = document.getElementById('cash-layer');
+      const symbols = ['$', '£', '€'];
+      for (let i = 0; i < count; i++) {
+        const b = document.createElement('div');
+        b.className = 'cash-bill';
+        b.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        b.style.left = Math.random() * 100 + 'vw';
+        b.style.animationDelay = (Math.random() * 0.6) + 's';
+        b.style.fontSize = (32 + Math.random() * 32) + 'px';
+        layer.appendChild(b);
+        setTimeout(() => b.remove(), 3400);
+      }
+    }
+
+    // Staleness guard — replayed effects on reconnect are ignored
+    function isLive(msg) {
+      return (Date.now() - msg.timestamp) < 3000;
+    }
+
+    channel.subscribe('state', (msg) => {
+      S = msg.data;
+      render();
+      startRenderLoop();
+    });
+    channel.subscribe('fx:penalty', (msg) => {
+      if (!isLive(msg)) return;
+      potHitAnim(msg.data.amount);
+    });
+    channel.subscribe('fx:win',  (msg) => { if (!isLive(msg)) return; triggerFlash('green'); });
+    channel.subscribe('fx:lose', (msg) => { if (!isLive(msg)) return; triggerFlash('red'); });
+    channel.subscribe('fx:cash', (msg) => { if (!isLive(msg)) return; cashBurst(); });
+
+    // NOTE: no sounds on the room display by design. Room audio is the sound
+    // desk's job — an unmanaged TV speaker playing penalty buzzes would fight
+    // the PA and bleed into boom mics. If a specific screen SHOULD have sound,
+    // copy the <audio> elements + playSound calls from overlay.html.
+  </script>
+</body>
+</html>
