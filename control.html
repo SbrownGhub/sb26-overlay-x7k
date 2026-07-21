@@ -41,6 +41,10 @@
       <button class="red" onclick="penaltyCustom()">-Custom</button>
       <input type="number" id="pot-penalty" placeholder="$" value="100">
     </div>
+    <div class="row">
+      <button class="green" onclick="rewardCustom()">+ Add to Pot</button>
+      <input type="number" id="pot-reward" placeholder="$" value="500">
+    </div>
     <div class="small">Drain at $35/min ≈ $18.9k over 9hrs — tune the rate so the pot lands where the finale needs it.</div>
   </div>
 
@@ -138,6 +142,17 @@
     function penaltyCustom() {
       const amt = parseFloat(document.getElementById('pot-penalty').value) || 0;
       if (amt > 0) penalty(amt);
+    }
+    function reward(amount) {
+      snapshot();
+      S.potBase = S.potBase + amount;
+      // fx first, state LAST (rewind recovery relies on state being newest)
+      channel.publish('fx:reward', { amount });
+      publish();
+    }
+    function rewardCustom() {
+      const amt = parseFloat(document.getElementById('pot-reward').value) || 0;
+      if (amt > 0) reward(amt);
     }
 
     // ---------- ROUND ----------

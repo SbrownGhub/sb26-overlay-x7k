@@ -53,10 +53,22 @@
     opacity: 0;
   }
   #penalty-pop.show { animation: penaltyFloat 1.6s ease-out forwards; }
+  #penalty-pop.reward { color: #00d97e; }
+  #penalty-pop.reward.show { animation: rewardFloat 2s ease-out forwards; }
   @keyframes penaltyFloat {
     0% { opacity: 0; transform: translateY(0); }
     15% { opacity: 1; }
     100% { opacity: 0; transform: translateY(-40px); }
+  }
+  @keyframes rewardFloat {
+    0% { opacity: 0; transform: translateY(0); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-48px); }
+  }
+  #pot-value.reward-hit { animation: potReward 2s ease-out; }
+  @keyframes potReward {
+    0% { color: #00d97e; transform: scale(1.08); }
+    100% { color: #ffffff; transform: scale(1); }
   }
 
   /* ROUND TIMER — top left */
@@ -133,6 +145,7 @@
   <audio id="sound-lose" src="sounds/lose.mp3" preload="auto"></audio>
   <audio id="sound-cash" src="sounds/cash.mp3" preload="auto"></audio>
   <audio id="sound-penalty" src="sounds/penalty.mp3" preload="auto"></audio>
+  <audio id="sound-addcash" src="sounds/addcash.mp3" preload="auto"></audio>
 
   <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
   <script>
@@ -235,6 +248,15 @@
       void penaltyEl.offsetWidth;
       penaltyEl.classList.add('show');
     }
+    function rewardAnim(amount) {
+      potEl.classList.remove('reward-hit');
+      void potEl.offsetWidth;
+      potEl.classList.add('reward-hit');
+      penaltyEl.classList.remove('reward', 'show');
+      penaltyEl.textContent = '+$' + amount.toLocaleString('en-US');
+      void penaltyEl.offsetWidth;
+      penaltyEl.classList.add('reward', 'show');
+    }
     function cashBurst(count = 24) {
       const layer = document.getElementById('cash-layer');
       const symbols = ['$', '£', '€'];
@@ -273,6 +295,7 @@
     channel.subscribe('fx:win',  (msg) => { if (!isLive(msg)) return; triggerFlash('green'); playSound('sound-win'); });
     channel.subscribe('fx:lose', (msg) => { if (!isLive(msg)) return; triggerFlash('red');  playSound('sound-lose'); });
     channel.subscribe('fx:cash', (msg) => { if (!isLive(msg)) return; cashBurst(); playSound('sound-cash'); });
+    channel.subscribe('fx:reward', (msg) => { if (!isLive(msg)) return; rewardAnim(msg.data.amount); playSound('sound-addcash'); });
   </script>
 </body>
 </html>

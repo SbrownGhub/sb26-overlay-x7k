@@ -115,10 +115,22 @@
     pointer-events: none;
   }
   #penalty-pop.show { animation: penaltyFloat 1.6s ease-out forwards; }
+  #penalty-pop.reward { color: #00d97e; }
+  #penalty-pop.reward.show { animation: rewardFloat 2s ease-out forwards; }
   @keyframes penaltyFloat {
     0% { opacity: 0; transform: translateY(0); }
     15% { opacity: 1; }
     100% { opacity: 0; transform: translateY(-8vh); }
+  }
+  @keyframes rewardFloat {
+    0% { opacity: 0; transform: translateY(0); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-10vh); }
+  }
+  #pot-value.reward-hit { animation: potReward 2s ease-out; }
+  @keyframes potReward {
+    0% { color: #ffffff; transform: scale(1.1); }
+    100% { color: #00d97e; transform: scale(1); }
   }
 
   /* Full screen flashes */
@@ -275,6 +287,15 @@
       void penaltyEl.offsetWidth;
       penaltyEl.classList.add('show');
     }
+    function rewardAnim(amount) {
+      potEl.classList.remove('reward-hit');
+      void potEl.offsetWidth;
+      potEl.classList.add('reward-hit');
+      penaltyEl.classList.remove('reward', 'show');
+      penaltyEl.textContent = '+$' + amount.toLocaleString('en-US');
+      void penaltyEl.offsetWidth;
+      penaltyEl.classList.add('reward', 'show');
+    }
     function cashBurst(count = 24) {
       const layer = document.getElementById('cash-layer');
       const symbols = ['$', '£', '€'];
@@ -307,6 +328,7 @@
     channel.subscribe('fx:win',  (msg) => { if (!isLive(msg)) return; triggerFlash('green'); });
     channel.subscribe('fx:lose', (msg) => { if (!isLive(msg)) return; triggerFlash('red'); });
     channel.subscribe('fx:cash', (msg) => { if (!isLive(msg)) return; cashBurst(); });
+    channel.subscribe('fx:reward', (msg) => { if (!isLive(msg)) return; rewardAnim(msg.data.amount); });
 
     // NOTE: no sounds on the room display by design. Room audio is the sound
     // desk's job — an unmanaged TV speaker playing penalty buzzes would fight
