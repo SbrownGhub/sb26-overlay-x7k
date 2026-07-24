@@ -4,336 +4,295 @@
 <meta charset="UTF-8">
 <title>Speed Build — Room Display</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+  :root { --red:#CC0000; --green:#00D97E; }
   html, body {
-    margin: 0; padding: 0;
-    background: #000000;
-    overflow: hidden;
-    width: 100vw; height: 100vh;
-    font-family: 'Arial Black', Arial, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    margin:0; padding:0; background:#000; overflow:hidden;
+    width:100vw; height:100vh; color:#fff;
+    font-family:'Roboto Mono',ui-monospace,monospace;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-font-smoothing:antialiased;
   }
+  .hide { display:none !important; }
 
-  /* ---- Lost-signal test card background ---- */
-  #bars {
-    position: fixed; top: 0; left: 0;
-    width: 100vw; height: 78vh;
-    display: flex;
-    z-index: 0;
-  }
-  #bars div { flex: 1; }
-  #bars-bottom {
-    position: fixed; bottom: 0; left: 0;
-    width: 100vw; height: 22vh;
-    display: flex;
-    z-index: 0;
-  }
-  #bars-bottom div { flex: 1; }
-  /* faint vertical scan texture + slow flicker over the bars */
-  #scanlines {
-    position: fixed; top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    z-index: 1;
-    pointer-events: none;
-    background: repeating-linear-gradient(90deg, rgba(0,0,0,0.14) 0 2px, rgba(255,255,255,0.03) 2px 4px);
-    animation: signalFlicker 4s steps(2) infinite;
-  }
-  @keyframes signalFlicker {
-    0%, 92% { opacity: 1; }
-    93%, 95% { opacity: 0.82; }
-    96%, 100% { opacity: 1; }
-  }
+  .tick { position:fixed; background:var(--red); z-index:4; }
+  .tl-h{top:26px;left:26px;width:54px;height:3px} .tl-v{top:26px;left:26px;width:3px;height:54px}
+  .tr-h{top:26px;right:26px;width:54px;height:3px} .tr-v{top:26px;right:26px;width:3px;height:54px}
+  .bl-h{bottom:26px;left:26px;width:54px;height:3px} .bl-v{bottom:26px;left:26px;width:3px;height:54px}
+  .br-h{bottom:26px;right:26px;width:54px;height:3px} .br-v{bottom:26px;right:26px;width:3px;height:54px}
 
-  /* central black panel — the classic blacked-out band over the bars */
-  #stack {
-    text-align: center;
-    z-index: 2;
-    background: #000;
-    padding: 5vh 6vw;
-    min-width: 62vw;
+  #scan {
+    position:fixed; inset:0; z-index:3; pointer-events:none;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.035) 0 1px, transparent 1px 4px);
+    animation:flicker 5s steps(2) infinite;
   }
+  @keyframes flicker { 0%,94%{opacity:1} 95%,97%{opacity:.85} 98%,100%{opacity:1} }
 
-  /* ROOM NAME — top of the stack */
-  #round-label {
-    font-size: 4.5vw;
-    letter-spacing: 1.2vw;
-    color: #ff3b3b;
-    margin-bottom: 1vh;
+  #band {
+    position:fixed; top:0; left:0; right:0; background:var(--red); padding:15px 0;
+    text-align:center; font-size:29px; letter-spacing:.5em; font-weight:700;
+    text-transform:uppercase; z-index:5; transform:translateY(-100%);
+    transition:transform .45s cubic-bezier(.2,.8,.2,1);
   }
+  #band.show { transform:translateY(0); }
 
-  /* ROUND TIMER — the centrepiece */
-  #round-timer {
-    font-family: 'Press Start 2P', 'Arial Black', monospace;
-    font-size: 10.6vw;
-    line-height: 1.1;
-    color: #ffffff;
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 40px rgba(255, 59, 59, 0.25);
-  }
-  #round-timer.warning {
-    color: #ff3b3b;
-    animation: pulse 1s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.55; }
-  }
+  #stack { text-align:center; z-index:2; padding:0 80px; width:100%; }
 
-  /* PRIZE POT — beneath the timer */
-  #pot-block { margin-top: 4vh; }
-  #pot-label {
-    font-size: 2.2vw;
-    letter-spacing: 1vw;
-    color: rgba(255,255,255,0.6);
-    margin-bottom: 0.5vh;
-  }
-  #pot-value {
-    font-family: 'Press Start 2P', 'Arial Black', monospace;
-    font-size: 4.7vw;
-    color: #00d97e;
-    font-variant-numeric: tabular-nums;
-  }
-  #pot-value.hit { animation: potHit 0.7s ease-out; }
-  @keyframes potHit {
-    0% { color: #ff3b3b; transform: scale(1.08); }
-    100% { color: #00d97e; transform: scale(1); }
-  }
+  #room { font-size:58px; letter-spacing:.22em; font-weight:700; text-transform:uppercase; min-height:72px; }
+  #room .k { color:var(--red); }
 
-  /* Penalty popup — floats over the pot */
-  #penalty-pop {
-    position: fixed;
-    bottom: 18vh;
-    width: 100vw;
-    text-align: center;
-    font-family: 'Press Start 2P', 'Arial Black', monospace;
-    font-size: 3.8vw;
-    color: #ff3b3b;
-    opacity: 0;
-    pointer-events: none;
-  }
-  #penalty-pop.show { animation: penaltyFloat 1.6s ease-out forwards; }
-  #penalty-pop.reward { color: #00d97e; }
-  #penalty-pop.reward.show { animation: rewardFloat 2s ease-out forwards; }
-  @keyframes penaltyFloat {
-    0% { opacity: 0; transform: translateY(0); }
-    15% { opacity: 1; }
-    100% { opacity: 0; transform: translateY(-8vh); }
-  }
-  @keyframes rewardFloat {
-    0% { opacity: 0; transform: translateY(0); }
-    12% { opacity: 1; }
-    100% { opacity: 0; transform: translateY(-10vh); }
-  }
-  #pot-value.reward-hit { animation: potReward 2s ease-out; }
-  @keyframes potReward {
-    0% { color: #ffffff; transform: scale(1.1); }
-    100% { color: #00d97e; transform: scale(1); }
-  }
+  #timer { font-size:268px; line-height:1; font-weight:700; font-variant-numeric:tabular-nums;
+           text-shadow:0 0 100px rgba(204,0,0,.28); margin-top:10px; }
+  #timer.warn { color:var(--red); animation:tick 1s steps(2) infinite; }
 
-  /* Full screen flashes */
-  #flash {
-    position: fixed; top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    opacity: 0; pointer-events: none;
-    z-index: 3;
-  }
-  /* Inverted: glow floods in from the screen edges, centre stays clear */
-  #flash.green { background: radial-gradient(ellipse at center, rgba(0,255,120,0) 35%, rgba(0,255,120,0.45) 70%, rgba(0,255,120,0.9) 100%); animation: flashPulse 1.8s ease-out forwards; }
-  #flash.red   { background: radial-gradient(ellipse at center, rgba(255,30,30,0) 35%, rgba(255,30,30,0.45) 70%, rgba(255,30,30,0.9) 100%); animation: flashPulse 1.8s ease-out forwards; }
-  @keyframes flashPulse { 0% {opacity:0;} 15% {opacity:1;} 100% {opacity:0;} }
+  #div { height:2px; background:#1E1E1E; margin:40px auto; width:56%; }
 
-  /* Cash burst */
-  #cash-layer { position: fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; overflow:hidden; z-index: 3; }
-  .cash-bill {
-    position: absolute; top: -60px;
-    color: #00d97e;
-    text-shadow: 0 0 10px rgba(0,0,0,0.6);
-    animation: fall 2.6s ease-in forwards;
-  }
-  @keyframes fall {
-    0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-    10% { opacity: 1; }
-    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-  }
+  #pot-lbl { font-size:30px; letter-spacing:.5em; color:rgba(255,255,255,.55); text-transform:uppercase; }
+  #pot { font-size:124px; font-weight:700; margin-top:10px; font-variant-numeric:tabular-nums; }
+  #pot .c { font-size:66px; opacity:.7; }
+  #pot.hit { animation:potHit .8s ease-out; }
 
-  /* No-round idle state: pot takes centre stage instead */
-  body.no-round #round-label, body.no-round #round-timer { display: none; }
-  body.no-round #pot-block { margin-top: 0; }
-  body.no-round #pot-label { font-size: 4vw; }
-  body.no-round #pot-value { font-size: 9.4vw; }
+  /* no timer showing — the pot takes the room */
+  body.no-timer #div { margin:22px auto; }
+  body.no-timer #pot-lbl { font-size:44px; }
+  body.no-timer #pot { font-size:206px; }
+  body.no-timer #pot .c { font-size:110px; }
 
-  #status {
-    position: fixed; bottom: 12px; left: 14px;
-    font-size: 11px; color: rgba(255,255,255,0.25);
-    font-family: monospace;
-  }
+  #paused { margin-top:24px; }
+  #paused .box { display:inline-block; background:var(--red); padding:12px 34px; }
+  #paused .t { font-size:34px; font-weight:700; letter-spacing:.42em; text-transform:uppercase;
+               animation:tick 1.4s steps(2) infinite; }
+
+  #rem { position:fixed; bottom:68px; left:0; right:0; text-align:center; z-index:2;
+         font-size:27px; letter-spacing:.35em; color:rgba(255,255,255,.55); text-transform:uppercase; }
+  #rem b { color:var(--red); font-size:42px; letter-spacing:.05em; }
+
+  #pen { position:fixed; bottom:196px; left:0; right:0; text-align:center; z-index:3;
+         font-size:96px; font-weight:700; color:var(--red); opacity:0;
+         font-variant-numeric:tabular-nums; pointer-events:none; }
+  #pen.show { animation:penFloat 1.7s ease-out forwards; }
+
+  #moment { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+            flex-direction:column; text-align:center; z-index:6; padding:0 70px; }
+  #moment.on { display:flex; }
+  #mo-bg { position:absolute; inset:0; }
+  #mo-inner { position:relative; }
+  #mo-kicker { font-size:38px; letter-spacing:.4em; text-transform:uppercase; font-weight:500; line-height:1.35; }
+  #mo-name { font-size:86px; font-weight:700; margin-top:22px; line-height:1; }
+  #moment.positive #mo-bg { background:var(--green); animation:slamBg .9s ease-out forwards; }
+  #moment.positive #mo-kicker { color:#00301B; }
+  #moment.positive #mo-name { color:#000; }
+  #moment.positive #mo-inner { animation:slamIn .55s cubic-bezier(.15,1.3,.4,1) both, fadeOut .3s ease-in 1.5s forwards; }
+  #moment.negative #mo-bg { background:var(--red); animation:elimBg 3.4s ease-out forwards; }
+  #moment.negative #mo-kicker { color:rgba(255,255,255,.85); }
+  #moment.negative #mo-name { color:#fff; }
+  #moment.negative #mo-inner { animation:elimIn .5s cubic-bezier(.15,1.2,.4,1) both, fadeOut .45s ease-in 2.9s forwards; }
+
+  #cash { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:4; }
+  #cash-wash { position:absolute; inset:0; background:radial-gradient(ellipse at center, transparent 30%, rgba(0,217,126,.13) 75%, rgba(0,217,126,.33) 100%); opacity:0; }
+  #cash-wash.on { animation:wash 2.2s ease-out forwards; }
+  .bill { position:absolute; top:-120px; font-weight:700; }
+
+  @keyframes potHit { 0%{color:var(--red);transform:scale(1.07)} 100%{color:#fff;transform:scale(1)} }
+  @keyframes penFloat { 0%{opacity:0;transform:translateY(0)} 15%{opacity:1} 100%{opacity:0;transform:translateY(-9vh)} }
+  @keyframes tick { 0%,100%{opacity:1} 50%{opacity:.4} }
+  @keyframes slamBg { 0%{opacity:0} 4%{opacity:1} 72%{opacity:1} 100%{opacity:0} }
+  @keyframes slamIn { 0%{transform:scale(2.4);opacity:0} 42%{opacity:1} 100%{transform:scale(1);opacity:1} }
+  @keyframes elimBg { 0%{opacity:0} 5%{opacity:1} 82%{opacity:1} 100%{opacity:0} }
+  @keyframes elimIn { 0%{transform:translateY(4vh);opacity:0} 100%{transform:translateY(0);opacity:1} }
+  @keyframes fadeOut { to{opacity:0} }
+  @keyframes wash { 0%{opacity:0} 12%{opacity:1} 100%{opacity:0} }
+  @keyframes fallA { 0%{transform:translate(0,0) rotate(0);opacity:0} 8%{opacity:1} 88%{opacity:1} 100%{transform:translate(var(--drift),1300px) rotate(var(--spin));opacity:0} }
+  @keyframes fallB { 0%{transform:translate(0,0) rotate(0) scale(.7);opacity:0} 10%{opacity:1} 85%{opacity:1} 100%{transform:translate(var(--drift),1300px) rotate(var(--spin)) scale(1.25);opacity:0} }
+  @keyframes fallC { 0%{transform:translate(0,0) rotate(0);opacity:0} 6%{opacity:1} 90%{opacity:1} 100%{transform:translate(calc(var(--drift) * -1),1300px) rotate(var(--spin));opacity:0} }
+
+  #status { position:fixed; bottom:12px; left:14px; font-size:10px; color:rgba(255,255,255,.18); letter-spacing:.14em; z-index:4; }
 </style>
 </head>
-<body class="no-round">
+<body class="no-timer">
 
-  <div id="bars">
-    <div style="background:#c8c8c8"></div>
-    <div style="background:#e6e600"></div>
-    <div style="background:#00e6e6"></div>
-    <div style="background:#00d100"></div>
-    <div style="background:#e600e6"></div>
-    <div style="background:#e60000"></div>
-    <div style="background:#0000e6"></div>
-  </div>
-  <div id="bars-bottom">
-    <div style="background:#0000e6"></div>
-    <div style="background:#131313"></div>
-    <div style="background:#e600e6"></div>
-    <div style="background:#131313"></div>
-    <div style="background:#00e6e6"></div>
-    <div style="background:#131313"></div>
-    <div style="background:#c8c8c8"></div>
-  </div>
-  <div id="scanlines"></div>
+  <div class="tick tl-h"></div><div class="tick tl-v"></div>
+  <div class="tick tr-h"></div><div class="tick tr-v"></div>
+  <div class="tick bl-h"></div><div class="tick bl-v"></div>
+  <div class="tick br-h"></div><div class="tick br-v"></div>
+  <div id="scan"></div>
+
+  <div id="band">Transmission received</div>
 
   <div id="stack">
-    <div id="round-label">ROUND</div>
-    <div id="round-timer">--:--</div>
+    <div id="room"><span class="k">ROOM = </span><span id="room-val"></span></div>
+    <div id="timer" class="hide">--:--</div>
+    <div id="div"></div>
     <div id="pot-block">
-      <div id="pot-label">PRIZE POT</div>
-      <div id="pot-value">$--,---</div>
+      <div id="pot-lbl">Prize pot</div>
+      <div id="pot">$--,---</div>
     </div>
+    <div id="paused" class="hide"><div class="box"><div class="t">Clock paused</div></div></div>
   </div>
 
-  <div id="penalty-pop"></div>
-  <div id="flash"></div>
-  <div id="cash-layer"></div>
-  <div id="status">connecting...</div>
+  <div id="rem" class="hide"><b id="rem-num">--</b>&nbsp; Remaining</div>
+  <div id="pen"></div>
 
-  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-  <script>
-    // ====== CONFIG — same key + channel as overlay.html / control.html ======
-    const ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
-    const CHANNEL_NAME = 'speedbuild-overlay-v2';
-    // =========================================================================
+  <div id="moment"><div id="mo-bg"></div><div id="mo-inner"><div id="mo-kicker"></div><div id="mo-name"></div></div></div>
 
-    const ably = new Ably.Realtime(ABLY_API_KEY);
-    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '10' } });
+  <div id="cash"><div id="cash-wash"></div></div>
+  <div id="status">connecting</div>
 
-    const potEl = document.getElementById('pot-value');
-    const penaltyEl = document.getElementById('penalty-pop');
-    const roundEl = document.getElementById('round-timer');
-    const roundLabel = document.getElementById('round-label');
-    const flashEl = document.getElementById('flash');
-    const statusEl = document.getElementById('status');
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+<script>
+  /* ============ CONFIG — must match control ============ */
+  var ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
+  var CHANNEL_NAME = 'speedbuild-v4';
+  var SURFACE = 'tv';
+  /* ==================================================== */
 
-    ably.connection.on('connected', () => statusEl.textContent = 'live · room display');
-    ably.connection.on('disconnected', () => statusEl.textContent = 'reconnecting...');
+  var $ = function (id) { return document.getElementById(id); };
+  var ably = new Ably.Realtime(ABLY_API_KEY);
+  var channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '10' } });
 
-    let S = null;
-    let renderTick = null;
+  ably.connection.on('connected', function () { $('status').textContent = 'live · room display'; });
+  ably.connection.on('disconnected', function () { $('status').textContent = 'reconnecting'; });
 
-    function fmtMoney(v) {
-      v = Math.max(0, v);
-      return '$' + Math.floor(v).toLocaleString('en-US');
-    }
-    function fmtTime(ms) {
-      ms = Math.max(0, ms);
-      const t = Math.floor(ms / 1000);
-      const m = String(Math.floor(t / 60)).padStart(2, '0');
-      const s = String(t % 60).padStart(2, '0');
-      return m + ':' + s;
-    }
-    function currentPot() {
-      if (!S) return null;
-      if (!S.potRunning) return S.potBase;
-      return S.potBase - ((Date.now() - S.potBaseTime) / 60000) * S.potRatePerMin;
-    }
-    function currentRoundRemaining() {
-      if (!S || !S.roundEndTime) return null;
-      return S.roundEndTime - Date.now();
-    }
+  var S = null, tickTimer = null;
 
-    function render() {
-      const pot = currentPot();
-      if (pot !== null) potEl.textContent = fmtMoney(pot);
+  /* Anything missing defaults to visible, so a partial state message can
+     never blank a room screen mid-show. */
+  function on(key) {
+    if (!S || !S.vis) return true;
+    var v = S.vis[key];
+    if (!v) return true;
+    return v[SURFACE] !== false;
+  }
 
-      const rem = currentRoundRemaining();
-      if (rem === null) {
-        document.body.classList.add('no-round');   // idle: pot goes huge and central
-      } else {
-        document.body.classList.remove('no-round');
-        roundLabel.textContent = S.roundName || 'ROUND';
-        roundEl.textContent = fmtTime(rem);
-        roundEl.classList.toggle('warning', rem < 5 * 60 * 1000);
-      }
-    }
+  function money(v) {
+    var n = Math.max(0, v), w = Math.floor(n), c = Math.floor((n - w) * 100);
+    return { main: '$' + w.toLocaleString('en-US'), cents: '.' + String(c).padStart(2, '0') };
+  }
+  function fmtTime(ms) {
+    var t = Math.floor(Math.max(0, ms) / 1000);
+    return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+  }
+  function currentPot() {
+    if (!S) return 0;
+    if (!S.potRunning) return S.potBase;
+    return S.potBase - ((Date.now() - S.potBaseTime) / 60000) * S.potRatePerMin;
+  }
+  function show(el, yes) { el.classList.toggle('hide', !yes); }
 
-    function startRenderLoop() {
-      if (renderTick) clearInterval(renderTick);
-      renderTick = setInterval(render, 250);
+  function render() {
+    if (!S) return;
+
+    show($('room'), on('room'));
+    $('room-val').textContent = S.roomName || '';
+
+    var showTimer = on('timer') && S.roundEndTime !== null && S.roundEndTime !== undefined;
+    show($('timer'), showTimer);
+    document.body.classList.toggle('no-timer', !showTimer);
+    if (showTimer) {
+      var rem = S.roundEndTime - Date.now();
+      $('timer').textContent = fmtTime(rem);
+      $('timer').classList.toggle('warn', rem < 5 * 60 * 1000);
     }
 
-    function triggerFlash(cls) {
-      flashEl.classList.remove('green', 'red');
-      void flashEl.offsetWidth;
-      flashEl.classList.add(cls);
-      setTimeout(() => flashEl.classList.remove(cls), 1900);
-    }
-    function potHitAnim(amount) {
-      potEl.classList.remove('hit');
-      void potEl.offsetWidth;
-      potEl.classList.add('hit');
-      penaltyEl.textContent = '-$' + amount.toLocaleString('en-US');
-      penaltyEl.classList.remove('show');
-      void penaltyEl.offsetWidth;
-      penaltyEl.classList.add('show');
-    }
-    function rewardAnim(amount) {
-      potEl.classList.remove('reward-hit');
-      void potEl.offsetWidth;
-      potEl.classList.add('reward-hit');
-      penaltyEl.classList.remove('reward', 'show');
-      penaltyEl.textContent = '+$' + amount.toLocaleString('en-US');
-      void penaltyEl.offsetWidth;
-      penaltyEl.classList.add('reward', 'show');
-    }
-    function cashBurst(count = 24) {
-      const layer = document.getElementById('cash-layer');
-      const symbols = ['$', '£', '€'];
-      for (let i = 0; i < count; i++) {
-        const b = document.createElement('div');
-        b.className = 'cash-bill';
-        b.textContent = symbols[Math.floor(Math.random() * symbols.length)];
-        b.style.left = Math.random() * 100 + 'vw';
-        b.style.animationDelay = (Math.random() * 0.6) + 's';
-        b.style.fontSize = (32 + Math.random() * 32) + 'px';
-        layer.appendChild(b);
-        setTimeout(() => b.remove(), 3400);
-      }
+    var showPot = on('pot');
+    show($('pot-block'), showPot);
+    if (showPot) {
+      var m = money(currentPot());
+      $('pot').innerHTML = m.main + '<span class="c">' + m.cents + '</span>';
     }
 
-    // Staleness guard — replayed effects on reconnect are ignored
-    function isLive(msg) {
-      return (Date.now() - msg.timestamp) < 3000;
-    }
+    show($('paused'), on('paused') && !S.potRunning);
+    show($('div'), on('room') || showTimer || showPot);
 
-    channel.subscribe('state', (msg) => {
-      S = msg.data;
-      render();
-      startRenderLoop();
+    var hasRem = on('remaining') && S.remaining !== null && S.remaining !== undefined;
+    show($('rem'), hasRem);
+    if (hasRem) $('rem-num').textContent = S.remaining;
+
+    /* The band only ever says something arrived. Printing the task here
+       would hand the room the answer. */
+    $('band').classList.toggle('show', !!(on('secret') && S.secret && S.secret.task));
+  }
+
+  function startLoop() {
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(render, 100);
+  }
+
+  function retrigger(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+  function doPenalty(amount) {
+    if (!on('penalty')) return;
+    if (on('pot')) retrigger($('pot'), 'hit');
+    $('pen').textContent = '\u2212$' + Number(amount || 0).toLocaleString('en-US');
+    retrigger($('pen'), 'show');
+  }
+
+  var momentTimer = null;
+  function doMoment(d) {
+    if (!on('moments')) return;
+    clearTimeout(momentTimer);
+    var el = $('moment');
+    el.className = '';
+    void el.offsetWidth;
+    $('mo-kicker').textContent = d.kicker || '';
+    var nameEl = $('mo-name');
+    nameEl.textContent = (d.name || '').toUpperCase();
+    nameEl.style.display = d.name ? 'block' : 'none';
+    var tone = d.tone === 'negative' ? 'negative' : 'positive';
+    el.classList.add('on', tone);
+    momentTimer = setTimeout(function () { el.className = ''; }, tone === 'positive' ? 2000 : 3500);
+  }
+
+  function doCash() {
+    if (!on('cash')) return;
+    var layer = $('cash');
+    retrigger($('cash-wash'), 'on');
+    var syms = ['$', '\u00A3', '\u20AC', '$', '$'];
+    for (var i = 0; i < 90; i++) {
+      var b = document.createElement('div');
+      b.className = 'bill';
+      b.textContent = syms[i % 5];
+      b.style.left = (Math.random() * 104 - 2) + '%';
+      b.style.fontSize = (30 + Math.random() * 76) + 'px';
+      b.style.color = (i % 4 !== 0) ? 'var(--green)' : '#fff';
+      b.style.setProperty('--spin', ((Math.random() < 0.5 ? -1 : 1) * (360 + Math.random() * 900)) + 'deg');
+      b.style.setProperty('--drift', ((Math.random() - 0.5) * 340) + 'px');
+      var anim = i % 3 === 0 ? 'fallA' : (i % 3 === 1 ? 'fallB' : 'fallC');
+      b.style.animation = anim + ' ' + (2.1 + Math.random() * 1.8) + 's cubic-bezier(.35,.05,.6,1) ' + (Math.random() * 1.1) + 's forwards';
+      layer.appendChild(b);
+      (function (node) { setTimeout(function () { node.remove(); }, 5200); })(b);
+    }
+  }
+
+  channel.subscribe('state', function (msg) {
+    try {
+      var d = msg.data;
+      if (!d) return;
+      /* REVISION GUARD — if a second control panel is holding older state
+         and heartbeats it, ignore it. Without this, a stale panel can roll
+         the pot, the count and the room name backwards mid-broadcast. */
+      if (S && typeof d.rev === 'number' && typeof S.rev === 'number' && d.rev < S.rev) return;
+      S = d; render(); startLoop();
+    }
+    catch (e) { console.warn('state render failed', e); }
+  });
+
+  function isLive(msg) { return (Date.now() - msg.timestamp) < 3000; }
+  function bind(ev, fn) {
+    channel.subscribe(ev, function (m) {
+      if (!isLive(m)) return;
+      try { fn(m.data || {}); } catch (e) { console.warn('fx failed', ev, e); }
     });
-    channel.subscribe('fx:penalty', (msg) => {
-      if (!isLive(msg)) return;
-      potHitAnim(msg.data.amount);
-    });
-    channel.subscribe('fx:win',  (msg) => { if (!isLive(msg)) return; triggerFlash('green'); });
-    channel.subscribe('fx:lose', (msg) => { if (!isLive(msg)) return; triggerFlash('red'); });
-    channel.subscribe('fx:cash', (msg) => { if (!isLive(msg)) return; cashBurst(); });
-    channel.subscribe('fx:reward', (msg) => { if (!isLive(msg)) return; rewardAnim(msg.data.amount); });
+  }
 
-    // NOTE: no sounds on the room display by design. Room audio is the sound
-    // desk's job — an unmanaged TV speaker playing penalty buzzes would fight
-    // the PA and bleed into boom mics. If a specific screen SHOULD have sound,
-    // copy the <audio> elements + playSound calls from overlay.html.
-  </script>
+  bind('fx:penalty', function (d) { doPenalty(d.amount); });
+  bind('fx:moment',  function (d) { doMoment(d); });
+  bind('fx:cash',    function () { doCash(); });
+
+  /* No audio on room screens by design. An unmanaged TV speaker firing
+     stings would fight the PA and bleed into the boom mics. */
+</script>
 </body>
 </html>

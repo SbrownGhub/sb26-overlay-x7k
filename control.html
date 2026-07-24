@@ -3,188 +3,425 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Speed Build — Control v2</title>
+<title>Speed Build — Bureau Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  body { background:#111; color:#fff; font-family:Arial,sans-serif; padding:24px 16px; max-width:520px; margin:0 auto; }
-  h1 { font-size:18px; margin:0 0 2px; }
-  #status { color:#888; font-size:12px; margin-bottom:20px; }
-  .section { background:#1b1b1b; border-radius:10px; padding:14px; margin-bottom:14px; }
-  .section h2 { font-size:13px; letter-spacing:2px; color:#999; margin:0 0 10px; text-transform:uppercase; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
-  button { padding:14px 16px; font-size:15px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; flex:1; min-width:100px; }
-  input { padding:12px; font-size:15px; border-radius:8px; border:1px solid #444; background:#222; color:#fff; flex:1; min-width:80px; }
-  .green{background:#00d97e;color:#000;} .red{background:#ff4444;color:#000;}
-  .neutral{background:#333;color:#fff;} .primary{background:#4c8cff;color:#000;}
-  .amber{background:#ffb84c;color:#000;}
-  #pot-readout { font-size:34px; font-weight:900; text-align:center; margin:6px 0 12px; font-variant-numeric:tabular-nums; }
-  .small { font-size:12px; color:#777; margin-top:6px; }
+  :root { --red:#CC0000; --green:#00D97E; --line:#1E1E1E; --dim:#5A5A5A; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    background:#050505; color:#fff; margin:0 auto; padding:18px 12px 70px;
+    max-width:520px; font-family:'Roboto Mono',ui-monospace,monospace;
+  }
+  h1 { font-size:11px; letter-spacing:.3em; margin:0; text-transform:uppercase; color:var(--red); }
+  #status { color:var(--dim); font-size:10px; letter-spacing:.1em; margin:6px 0 16px; }
+  .card { background:#0A0A0A; border:1px solid var(--line); padding:15px; margin-bottom:11px; }
+  .card.live { border-color:var(--red); }
+  .lbl { font-size:10px; letter-spacing:.24em; color:#7A7A7A; margin-bottom:10px; text-transform:uppercase; }
+  .mini { font-size:9px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; margin:9px 0 5px; }
+  .row { display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap; }
+  button {
+    flex:1; min-width:74px; padding:11px 12px; font-size:11px; font-weight:700;
+    letter-spacing:.11em; text-transform:uppercase; cursor:pointer;
+    font-family:inherit; background:transparent; color:#fff; border:1px solid var(--line);
+  }
+  button.sm { min-width:50px; padding:8px 10px; font-size:10px; }
+  button.red   { background:var(--red);   border-color:var(--red);   color:#fff; }
+  button.green { background:var(--green); border-color:var(--green); color:#00301B; }
+  button.white { background:#fff; border-color:#fff; color:#000; }
+  button.on    { background:rgba(204,0,0,.2); border-color:var(--red); color:#fff; }
+  button:active { transform:translateY(1px); }
+  input {
+    flex:1; min-width:0; padding:11px 12px; font-size:13px; font-family:inherit;
+    background:#000; color:#fff; border:1px solid var(--line);
+  }
+  input:focus, button:focus { outline:1px solid #fff; }
+  #pot-readout { font-size:30px; font-weight:700; text-align:center; margin:2px 0 4px; font-variant-numeric:tabular-nums; }
+  #pot-readout .c { font-size:19px; opacity:.7; }
+  #pot-state { text-align:center; font-size:10px; letter-spacing:.2em; margin-bottom:12px; text-transform:uppercase; }
+  #rem-readout { font-size:34px; font-weight:700; text-align:center; color:var(--red); margin:0 0 10px; }
+  .hint { font-size:9px; color:var(--dim); line-height:1.7; margin-top:6px; }
+  .live-tag { font-size:10px; color:var(--red); letter-spacing:.16em; margin-top:6px; }
+
+  /* visibility grid */
+  #vis-grid { display:grid; grid-template-columns:1fr 48px 48px; gap:5px; align-items:center; }
+  #vis-grid .h { font-size:8px; letter-spacing:.16em; color:var(--dim); text-align:center; }
+  #vis-grid .n { font-size:11px; color:#BEBEBE; }
+  #vis-grid button { min-width:0; width:48px; padding:6px 0; font-size:9px; letter-spacing:.08em; }
+  #vis-grid button.yes { background:var(--green); border-color:var(--green); color:#00301B; }
+  #vis-grid button.no  { background:transparent; border-color:var(--line); color:#4A4A4A; }
 </style>
 </head>
 <body>
-  <h1>Speed Build Control v2</h1>
-  <div id="status">connecting...</div>
+  <h1>Bureau Control</h1>
+  <div id="status">connecting</div>
 
-  <div class="section">
-    <h2>Prize Pot</h2>
+  <div class="card">
+    <div class="lbl">Prize pot</div>
     <div id="pot-readout">$--,---</div>
+    <div id="pot-state">paused</div>
     <div class="row">
-      <input type="number" id="pot-set" placeholder="Set pot $" value="20000">
-      <button class="neutral" onclick="setPot()">Set</button>
+      <input type="number" id="pot-set" placeholder="Set $" value="20000">
+      <button onclick="setPot()">Set</button>
     </div>
     <div class="row">
-      <input type="number" id="pot-rate" placeholder="Drain $/min" value="35">
-      <button class="primary" onclick="startPot()">▶ Start Drain</button>
-      <button class="amber" onclick="pausePot()">⏸ Pause</button>
+      <input type="number" id="pot-rate" placeholder="$/min" value="35" style="max-width:80px">
+      <button class="white" onclick="startPot()">Start</button>
+      <button onclick="pausePot()">Pause</button>
     </div>
     <div class="row">
-      <button class="red" onclick="penalty(50)">-$50 Penalty</button>
-      <button class="red" onclick="penaltyCustom()">-Custom</button>
-      <input type="number" id="pot-penalty" placeholder="$" value="100">
+      <button class="red" onclick="penalty(50)">&minus;$50</button>
+      <input type="number" id="pot-pen" placeholder="$" value="100" style="max-width:74px">
+      <button class="red" onclick="penaltyCustom()">&minus;Custom</button>
     </div>
     <div class="row">
-      <button class="green" onclick="rewardCustom()">+ Add to Pot</button>
-      <input type="number" id="pot-reward" placeholder="$" value="500">
-    </div>
-    <div class="small">Drain at $35/min ≈ $18.9k over 9hrs — tune the rate so the pot lands where the finale needs it.</div>
-  </div>
-
-  <div class="section">
-    <h2>Round Timer</h2>
-    <div class="row">
-      <input type="text" id="round-name" placeholder="Round label" value="ROOM 1 — OPERATIONS">
-      <input type="number" id="round-mins" placeholder="Mins" value="40">
-    </div>
-    <div class="row">
-      <button class="primary" onclick="startRound()">▶ Start Round</button>
-      <button class="neutral" onclick="clearRound()">Hide Timer</button>
+      <button onclick="rewardCustom()">+ Add</button>
+      <input type="number" id="pot-add" placeholder="$" value="500" style="max-width:74px">
     </div>
   </div>
 
-  <div class="section">
-    <h2>Effects</h2>
+  <div class="card">
+    <div class="lbl">Room &amp; timer</div>
     <div class="row">
-      <button class="green" onclick="fx('fx:win')">🟢 WIN</button>
-      <button class="red" onclick="fx('fx:lose')">🔴 LOSE</button>
-      <button class="primary" onclick="fx('fx:cash')">💰 CASH</button>
+      <input type="text" id="room-name" placeholder="Room name" value="OPERATION">
+      <input type="number" id="round-mins" placeholder="Mins" value="40" style="max-width:66px">
+    </div>
+    <div class="row">
+      <button class="white" onclick="startRound()">Start timer</button>
+      <button onclick="clearRound()">Hide timer</button>
     </div>
   </div>
 
-  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-  <script>
-    // ====== CONFIG — must match overlay.html ======
-    const ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
-    const CHANNEL_NAME = 'speedbuild-overlay-v2';
-    // ================================================
+  <div class="card">
+    <div class="lbl">Contestants remaining</div>
+    <div id="rem-readout">--</div>
+    <div class="row">
+      <button onclick="bumpRem(-1)">&minus; 1</button>
+      <input type="number" id="rem-set" placeholder="Set" value="30" style="max-width:74px">
+      <button onclick="setRem()">Set</button>
+    </div>
+  </div>
 
-    const ably = new Ably.Realtime(ABLY_API_KEY);
-    const channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '1' } });
-    const statusEl = document.getElementById('status');
-    const readout = document.getElementById('pot-readout');
+  <div class="card" id="secret-card">
+    <div class="lbl">Secret challenge</div>
+    <div class="row"><input type="text" id="sec-name" placeholder="Contestant"></div>
+    <div class="row"><input type="text" id="sec-task" placeholder="The task"></div>
+    <div class="row"><input type="text" id="sec-prize" placeholder="Prize"></div>
+    <div class="mini">Size</div>
+    <div class="row" id="size-btns">
+      <button class="sm" data-size="sm">Small</button>
+      <button class="sm" data-size="md">Medium</button>
+      <button class="sm" data-size="lg">Large</button>
+    </div>
+    <div class="mini">Position</div>
+    <div class="row" id="side-btns">
+      <button class="sm" data-side="left">Left</button>
+      <button class="sm" data-side="right">Right</button>
+    </div>
+    <div class="row">
+      <button class="red" onclick="showSecret()">Put up</button>
+      <button onclick="hideSecret()">Take down</button>
+    </div>
+    <div class="live-tag" id="sec-live"></div>
+  </div>
 
-    ably.connection.on('connected', () => statusEl.textContent = 'connected · ' + CHANNEL_NAME);
+  <div class="card">
+    <div class="lbl">Moments</div>
+    <div class="row"><input type="text" id="mom-name" placeholder="Name — or leave blank"></div>
+    <div class="row"><button class="green" onclick="moment('positive','Challenge complete')">Challenge complete</button></div>
+    <div class="row"><button class="green" onclick="moment('positive','Secret challenge complete')">Secret complete</button></div>
+    <div class="row"><button class="green" onclick="moment('positive','Team challenge complete')">Team complete</button></div>
+    <div class="row"><button class="red" onclick="moment('negative','Eliminated')">Eliminated</button></div>
+    <div class="row"><button onclick="cash()">Cash burst</button></div>
+  </div>
 
-    // ---------- STATE (control panel is the source of truth) ----------
-    let S = {
-      potBase: 20000,        // pot value at potBaseTime
-      potBaseTime: Date.now(),
-      potRatePerMin: 35,
-      potRunning: false,
-      roundEndTime: null,
-      roundName: null
-    };
+  <div class="card">
+    <div class="lbl">Show on</div>
+    <div id="vis-grid"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="sm" onclick="setAllVis(true)">All on</button>
+      <button class="sm" onclick="setAllVis(false)">All off</button>
+    </div>
+  </div>
 
-    // On load, pick up existing state (e.g. control panel reopened mid-show)
-    channel.subscribe('state', (msg) => { S = msg.data; });
+  <div class="card">
+    <div class="lbl">Custom moment</div>
+    <div class="row"><input type="text" id="cus-text" placeholder="Anything you like" value="Immunity granted"></div>
+    <div class="row" id="tone-btns">
+      <button class="sm" data-tone="positive">Good</button>
+      <button class="sm" data-tone="negative">Bad</button>
+    </div>
+    <div class="row"><button id="cus-fire" class="green" onclick="fireCustom()">Fire it</button></div>
+    <div class="hint">Uses the name above. Clear that field for a message on its own.</div>
+  </div>
 
-    function currentPot() {
-      if (!S.potRunning) return S.potBase;
-      return S.potBase - ((Date.now() - S.potBaseTime) / 60000) * S.potRatePerMin;
-    }
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+<script>
+  /* ============ CONFIG — must match overlay + room display ============ */
+  var ABLY_API_KEY = 'tBw4fw.80_qjg:lyIY2luq1ef0IESrQLekGmz7FJgbSCp0gcLtpfDqcS8';
+  var CHANNEL_NAME = 'speedbuild-v4';
+  /* =================================================================== */
 
-    // Freeze the current computed value into base before any change,
-    // so pausing/re-rating never jumps the number.
-    function snapshot() {
-      S.potBase = currentPot();
-      S.potBaseTime = Date.now();
-    }
+  var VIS_ROWS = [
+    ['room','Room name'], ['timer','Timer'], ['pot','Prize pot'],
+    ['paused','Clock paused'], ['remaining','Remaining'], ['secret','Secret challenge'],
+    ['penalty','Penalties'], ['moments','Moments'], ['cash','Cash burst']
+  ];
 
-    function publish() {
-      channel.publish('state', S);
-    }
+  function defaultVis() {
+    var v = {};
+    VIS_ROWS.forEach(function (r) { v[r[0]] = { tv: true, stream: true }; });
+    return v;
+  }
 
-    // ---------- POT ----------
-    function setPot() {
-      snapshot();
-      S.potBase = parseFloat(document.getElementById('pot-set').value) || 0;
-      S.potBaseTime = Date.now();
-      publish();
-    }
-    function startPot() {
-      snapshot();
-      S.potRatePerMin = parseFloat(document.getElementById('pot-rate').value) || 0;
-      S.potRunning = true;
-      publish();
-    }
-    function pausePot() {
-      snapshot();
-      S.potRunning = false;
-      publish();
-    }
-    function penalty(amount) {
-      snapshot();
-      S.potBase = Math.max(0, S.potBase - amount);
-      // fx first, state LAST — rewind=1 replays only the most recent message,
-      // so state must always be the newest thing on the channel for a
-      // reconnecting overlay to recover correctly.
-      channel.publish('fx:penalty', { amount });
-      publish();
-    }
-    function penaltyCustom() {
-      const amt = parseFloat(document.getElementById('pot-penalty').value) || 0;
-      if (amt > 0) penalty(amt);
-    }
-    function reward(amount) {
-      snapshot();
-      S.potBase = S.potBase + amount;
-      // fx first, state LAST (rewind recovery relies on state being newest)
-      channel.publish('fx:reward', { amount });
-      publish();
-    }
-    function rewardCustom() {
-      const amt = parseFloat(document.getElementById('pot-reward').value) || 0;
-      if (amt > 0) reward(amt);
-    }
+  /* Control panel is the single source of truth. Every change publishes a
+     full snapshot, so a screen that joins late is instantly correct. */
+  var S = {
+    rev: 0, updatedAt: Date.now(),
+    potBase: 20000, potBaseTime: Date.now(), potRatePerMin: 35, potRunning: false,
+    roundEndTime: null, roomName: 'OPERATION', remaining: 30,
+    secret: null, secretSize: 'md', secretSide: 'left',
+    vis: defaultVis()
+  };
 
-    // ---------- ROUND ----------
-    function startRound() {
-      const mins = parseFloat(document.getElementById('round-mins').value) || 0;
-      S.roundName = document.getElementById('round-name').value || 'ROUND';
-      S.roundEndTime = Date.now() + mins * 60000;
-      publish();
-    }
-    function clearRound() {
-      S.roundEndTime = null;
-      publish();
-    }
+  /* ADOPTED gate. The panel must NOT publish until it knows whether a show
+     is already running. Publishing defaults over a live show is the one
+     failure that loses four hours of progress. */
+  var ADOPTED = false;
+  var LS_KEY = 'sb26-state-' + CHANNEL_NAME;
 
-    // ---------- FX ----------
-    // Effects also republish state afterwards, so the newest channel message
-    // is always 'state' — a reconnecting overlay's rewind=1 then always
-    // recovers the pot/timer, never just a sound cue.
-    function fx(name) {
-      channel.publish(name, {});
-      publish();
+  var ably = new Ably.Realtime(ABLY_API_KEY);
+  var channel = ably.channels.get(CHANNEL_NAME, { params: { rewind: '10' } });
+  var $ = function (id) { return document.getElementById(id); };
+
+  ably.connection.on('connected', function () { $('status').textContent = 'connected · ' + CHANNEL_NAME; });
+  ably.connection.on('disconnected', function () { $('status').textContent = 'reconnecting'; });
+
+  /* Reopening the panel mid-show adopts whatever is already live.
+     REVISION GUARD: a second panel holding older state must never be able
+     to overwrite a newer one. Older revisions are ignored outright. */
+  channel.subscribe('state', function (msg) {
+    if (!msg || !msg.data) return;
+    var d = msg.data;
+    if (typeof d.rev === 'number' && typeof S.rev === 'number' && d.rev < S.rev) return;
+    if (typeof d.rev === 'number' && d.rev === S.rev && ADOPTED) return; /* our own heartbeat */
+    S = Object.assign({}, S, d);
+    if (!S.vis) S.vis = defaultVis();
+    ADOPTED = true;
+    saveLocal();
+    reflect();
+  });
+
+  function saveLocal() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
+  }
+
+  /* A real change: bump the revision, stamp it, save, send. */
+  function publish() {
+    S.rev = (S.rev || 0) + 1;
+    S.updatedAt = Date.now();
+    ADOPTED = true;
+    saveLocal();
+    channel.publish('state', S);
+  }
+
+  /* Heartbeat: republishes the SAME revision. Never bumps, so it can never
+     win a race against another panel's genuine change. */
+  function heartbeat() {
+    if (!ADOPTED) return;
+    channel.publish('state', S);
+  }
+
+  function currentPot() {
+    if (!S.potRunning) return S.potBase;
+    return S.potBase - ((Date.now() - S.potBaseTime) / 60000) * S.potRatePerMin;
+  }
+  /* Freeze the computed value before any change, so nothing ever jumps. */
+  function snapshot() { S.potBase = currentPot(); S.potBaseTime = Date.now(); }
+
+  function money(v) {
+    var n = Math.max(0, v), w = Math.floor(n), c = Math.floor((n - w) * 100);
+    return { main: '$' + w.toLocaleString('en-US'), cents: '.' + String(c).padStart(2, '0') };
+  }
+
+  /* ---------- pot ---------- */
+  function setPot()   { snapshot(); S.potBase = parseFloat($('pot-set').value) || 0; S.potBaseTime = Date.now(); publish(); reflect(); }
+  function startPot() { snapshot(); S.potRatePerMin = parseFloat($('pot-rate').value) || 0; S.potRunning = true; publish(); reflect(); }
+  function pausePot() { snapshot(); S.potRunning = false; publish(); reflect(); }
+  function penalty(a) {
+    snapshot();
+    S.potBase = Math.max(0, S.potBase - a);
+    /* fx first, state LAST — rewind replays only the newest message, and a
+       reconnecting screen must find state there, not an effect. */
+    channel.publish('fx:penalty', { amount: a });
+    publish();
+  }
+  function penaltyCustom() { var a = parseFloat($('pot-pen').value) || 0; if (a > 0) penalty(a); }
+  function rewardCustom() {
+    var a = parseFloat($('pot-add').value) || 0;
+    if (a <= 0) return;
+    snapshot(); S.potBase += a; publish(); reflect();
+  }
+
+  /* ---------- room + timer ---------- */
+  function startRound() {
+    var m = parseFloat($('round-mins').value) || 0;
+    S.roomName = ($('room-name').value || '').toUpperCase();
+    S.roundEndTime = Date.now() + m * 60000;
+    publish();
+  }
+  function clearRound() {
+    S.roomName = ($('room-name').value || '').toUpperCase();
+    S.roundEndTime = null;
+    publish();
+  }
+
+  /* ---------- remaining ---------- */
+  function setRem() {
+    var n = parseInt($('rem-set').value, 10);
+    S.remaining = isNaN(n) ? null : n;
+    publish(); reflect();
+  }
+  function bumpRem(d) {
+    if (S.remaining === null || S.remaining === undefined) return;
+    S.remaining = Math.max(0, S.remaining + d);
+    $('rem-set').value = S.remaining;
+    publish(); reflect();
+  }
+
+  /* ---------- secret ---------- */
+  function showSecret() {
+    var task = $('sec-task').value.trim();
+    if (!task) return;
+    S.secret = { name: $('sec-name').value.trim(), task: task, prize: $('sec-prize').value.trim() };
+    publish(); reflect();
+  }
+  function hideSecret() { S.secret = null; publish(); reflect(); }
+
+  /* ---------- moments ---------- */
+  function moment(tone, kicker) {
+    channel.publish('fx:moment', { tone: tone, kicker: kicker, name: $('mom-name').value.trim() });
+    publish();
+  }
+  function fireCustom() {
+    var text = $('cus-text').value.trim();
+    if (!text) return;
+    moment(currentTone, text);
+  }
+  function cash() { channel.publish('fx:cash', {}); publish(); }
+
+  /* ---------- visibility ---------- */
+  function toggleVis(key, surf) {
+    if (!S.vis[key]) S.vis[key] = { tv: true, stream: true };
+    S.vis[key][surf] = !S.vis[key][surf];
+    publish(); reflect();
+  }
+  function setAllVis(on) {
+    VIS_ROWS.forEach(function (r) { S.vis[r[0]] = { tv: on, stream: on }; });
+    publish(); reflect();
+  }
+
+  function buildVisGrid() {
+    var g = $('vis-grid');
+    g.innerHTML = '';
+    var blank = document.createElement('div');
+    g.appendChild(blank);
+    ['TV', 'STREAM'].forEach(function (h) {
+      var d = document.createElement('div'); d.className = 'h'; d.textContent = h; g.appendChild(d);
+    });
+    VIS_ROWS.forEach(function (r) {
+      var n = document.createElement('div'); n.className = 'n'; n.textContent = r[1]; g.appendChild(n);
+      ['tv', 'stream'].forEach(function (surf) {
+        var b = document.createElement('button');
+        b.dataset.key = r[0]; b.dataset.surf = surf;
+        b.onclick = function () { toggleVis(r[0], surf); };
+        g.appendChild(b);
+      });
+    });
+  }
+
+  /* ---------- selectors ---------- */
+  var currentTone = 'positive';
+  function wireGroup(containerId, attr, onPick) {
+    var c = $(containerId);
+    c.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      onPick(b.dataset[attr]);
+    });
+  }
+  wireGroup('size-btns', 'size', function (v) { S.secretSize = v; publish(); reflect(); });
+  wireGroup('side-btns', 'side', function (v) { S.secretSide = v; publish(); reflect(); });
+  wireGroup('tone-btns', 'tone', function (v) { currentTone = v; reflect(); });
+
+  /* ---------- reflect state into the panel ---------- */
+  function reflect() {
+    $('rem-readout').textContent = (S.remaining === null || S.remaining === undefined) ? '--' : S.remaining;
+
+    var card = $('secret-card'), tag = $('sec-live');
+    if (S.secret) { card.classList.add('live'); tag.textContent = 'ON SCREEN NOW'; }
+    else { card.classList.remove('live'); tag.textContent = ''; }
+
+    $('pot-state').textContent = S.potRunning ? 'draining' : 'paused';
+    $('pot-state').style.color = S.potRunning ? 'var(--green)' : 'var(--red)';
+
+    document.querySelectorAll('#size-btns button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.size === S.secretSize);
+    });
+    document.querySelectorAll('#side-btns button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.side === S.secretSide);
+    });
+    document.querySelectorAll('#tone-btns button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.tone === currentTone);
+    });
+    var fire = $('cus-fire');
+    fire.className = currentTone === 'positive' ? 'green' : 'red';
+
+    document.querySelectorAll('#vis-grid button').forEach(function (b) {
+      var v = S.vis[b.dataset.key] || { tv: true, stream: true };
+      var on = v[b.dataset.surf] !== false;
+      b.className = on ? 'yes' : 'no';
+      b.textContent = on ? 'On' : 'Off';
+    });
+  }
+
+  /* local readout so the operator never needs to look at a screen */
+  setInterval(function () {
+    var m = money(currentPot());
+    $('pot-readout').innerHTML = m.main + '<span class="c">' + m.cents + '</span>';
+  }, 100);
+
+  /* Heartbeat with jitter. Keeps a state message inside Ably's rewind
+     window at all times so any screen that reloads recovers instantly. */
+  setInterval(heartbeat, 30000 + Math.floor(Math.random() * 5000));
+
+  /* ---------- BOOT ----------
+     Give the channel 7 seconds to hand us a live show. If one arrives we
+     adopt it (handled in the subscriber). If nothing arrives, fall back to
+     the local backup — that covers the case where every device died and
+     Ably's rewind window has expired. Only then do we go live with our own
+     state. Until one of those happens, this panel publishes NOTHING. */
+  setTimeout(function () {
+    if (ADOPTED) return;
+    var raw = null;
+    try { raw = localStorage.getItem(LS_KEY); } catch (e) {}
+    if (raw) {
+      try {
+        var saved = JSON.parse(raw);
+        if (saved && typeof saved.rev === 'number') {
+          S = Object.assign({}, S, saved);
+          if (!S.vis) S.vis = defaultVis();
+          $('status').textContent = 'restored from local backup · rev ' + S.rev;
+          reflect();
+        }
+      } catch (e) {}
     }
+    ADOPTED = true;
+    publish();
+  }, 7000);
 
-    // Local readout so the operator sees the pot without looking at the stream
-    setInterval(() => {
-      readout.textContent = '$' + Math.max(0, Math.floor(currentPot())).toLocaleString('en-US');
-    }, 250);
-
-    // Heartbeat: republish state every ~30s (with jitter so multiple open
-    // panels don't all fire at once). Self-heals any message-ordering edge
-    // case within half a minute, and keeps rewind recovery always-fresh.
-    setInterval(() => { publish(); }, 30000 + Math.floor(Math.random() * 5000));
-  </script>
+  buildVisGrid();
+  reflect();
+</script>
 </body>
 </html>
